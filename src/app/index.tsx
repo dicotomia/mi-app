@@ -10,22 +10,18 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { CatState, useCatState } from "../hooks/useCatState";
 import { useOnboarding, UserProfile } from "../hooks/useOnboarding";
 import { usePedometer } from "../hooks/usePedometer";
+import {
+  getCatImage,
+  getCatStateName,
+  getCompoundState,
+  getGoal,
+} from "../lib/cat";
 
 export default function HomeScreen() {
-  const { isCompleted, profile, completeOnboarding, resetProfile } =
-    useOnboarding();
-  const { steps, addSimulatedSteps, resetSteps } = usePedometer();
-
-  // Estado para controlar la pantalla de carga (Splash Screen) con GIF
-  const [showSplash, setShowSplash] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowSplash(false), 3500); // El GIF se mostrará por 3.5 segundos
-    return () => clearTimeout(timer);
-  }, []);
+  const { isCompleted, profile, completeOnboarding } = useOnboarding();
+  const { steps: pedometerSteps } = usePedometer();
 
   // Animación de flotación (Idle Animation) para el gato
   const floatAnim = useRef(new Animated.Value(0)).current;
@@ -48,250 +44,205 @@ export default function HomeScreen() {
     ).start();
   }, []);
 
+  // Animación de fuego al pasar los 12000 pasos
+  const fireAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (pedometerSteps >= 12000) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(fireAnim, {
+            toValue: 1.4,
+            duration: 350,
+            useNativeDriver: true,
+          }),
+          Animated.timing(fireAnim, {
+            toValue: 1,
+            duration: 350,
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
+    }
+  }, [pedometerSteps]);
+
   // Estado temporal para el cuestionario
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [tempProfile, setTempProfile] = useState<Partial<UserProfile>>({});
+  const [customGoal, setCustomGoal] = useState("10000");
 
-  // Meta dinámica basada en el perfil
-  const goal =
-    profile?.activityLevel === "sedentary"
-      ? 5000
-      : profile?.activityLevel === "light"
-        ? 7500
-        : profile?.activityLevel === "intense"
-          ? 12000
-          : 10000;
+  // Lógica de la app centralizada en el módulo `cat.ts`
+  const goal = getGoal(profile);
+  const compoundState = getCompoundState(
+    pedometerSteps,
+    profile?.sleepHours,
+    profile?.lastHobbyDate,
+    profile?.forceSleep || false,
+    profile?.sanityPoints || 0,
+  );
 
-  // Calculamos el estado del gato basado en los pasos simulados
-  const catState = useCatState(steps, goal);
-  const progressPercentage = Math.min((steps / goal) * 100, 100);
-
-  // Lógica para la imagen animada del gato basado en color y estado
-  const getCatImage = () => {
-    const color = profile?.catColor || "orange";
-
-    // Por ahora usamos las imágenes del gato negro para todos los colores
-    // para que puedas ver los cambios de estado sin importar el color elegido.
-    switch (catState) {
-      case "fit":
-        return require("../../assets/images/black-fit.png"); // Más de 9000 pasos
-      case "cardio":
-        return require("../../assets/images/black-cardio.png"); // 8000 a 8999 pasos
-      case "paseo":
-        return require("../../assets/images/black-paseo.png"); // 4000 a 7999 pasos
-      case "sedentario":
-        return require("../../assets/images/black-sedentario.png"); // 1000 a 3999 pasos
-      case "enfermo":
-        return require("../../assets/images/black-enfermo.png"); // 0 a 999 pasos
-      default:
-        return require("../../assets/images/gatogirando.gif");
-    }
-  };
-
-  // Lógica para las imágenes de las caras en la sección de Salud
-  const getFaceImage = (stateName: CatState) => {
-    // NOTA: He puesto el sufijo "-cara.png". Cambia esto por el nombre exacto de tus archivos
-    switch (stateName) {
-      case "fit":
-        return require("../../assets/images/black-fit-cara.png");
-      case "cardio":
-        return require("../../assets/images/black-cardio-cara.png");
-      case "paseo":
-        // Imagen faltante: Usamos la cara "sedentario" temporalmente para que la app no dé error.
-        return require("../../assets/images/black-sedentario-cara.png");
-      case "sedentario":
-        return require("../../assets/images/black-sedentario-cara.png");
-      case "enfermo":
-        return require("../../assets/images/black-enfermo-cara.png");
-      default:
-        return require("../../assets/images/gatogirando.gif");
-    }
-  };
+  // La barra escala hasta 12000 (OMS) o la meta del usuario si es mayor
+  const maxLimit = Math.max(12000, goal);
+  const progressPercentage = Math.min((pedometerSteps / maxLimit) * 100, 100);
+  const markerPositionPercentage = Math.min((goal / maxLimit) * 100, 100);
 
   // Flujo de Onboarding (Cuestionario de Salud)
   if (!isCompleted) {
-    const handleActivitySelect = (level: UserProfile["activityLevel"]) => {
-      setTempProfile({ ...tempProfile, activityLevel: level });
+    const handleNameSubmit = () => {
+      if (!tempProfile.catName) {
+        setTempProfile({ ...tempProfile, catName: "Gatito" });
+      }
       setOnboardingStep(1);
     };
 
-    const handleSleepSelect = (hours: string) => {
-      setTempProfile({ ...tempProfile, sleepHours: hours });
+    const handleActivitySelect = (level: UserProfile["activityLevel"]) => {
+      setTempProfile({ ...tempProfile, activityLevel: level });
       setOnboardingStep(2);
     };
 
-    const handleHabitsSelect = (smoker: boolean) => {
-      setTempProfile({ ...tempProfile, smoker, catColor: "orange" });
-      setOnboardingStep(3); // Vamos al último paso: El Gato
+    const handleGoalSubmit = () => {
+      setTempProfile({
+        ...tempProfile,
+        stepGoal: parseInt(customGoal) || 10000,
+      });
+      setOnboardingStep(3);
+    };
+
+    const handleSleepSelect = (
+      hours: "less_4" | "less_6" | "6_8" | "more_8",
+    ) => {
+      completeOnboarding({
+        ...tempProfile,
+        sleepHours: hours,
+        catColor: "black", // Eliminamos colores por ahora
+        smoker: false,
+      } as UserProfile);
     };
 
     return (
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={styles.onboardingContainer}
       >
         <View style={styles.onboardingCard}>
           {onboardingStep === 0 && (
             <>
-              <Text style={{ fontSize: 80, marginBottom: 10 }}>👋</Text>
-              <Text style={styles.title}>¡Hola!</Text>
-              <Text style={styles.subtitle}>
-                ¿Cuál es tu nivel de actividad física actual?
+              <Image
+                source={require("../../assets/images/negro/estado_atleta.png")}
+                style={styles.onboardingImage}
+                resizeMode="contain"
+              />
+
+              <Text style={styles.onboardingSubtitle}>
+                Nombre de tu mascota:
               </Text>
-              <TouchableOpacity
-                style={styles.optionButton}
-                onPress={() => handleActivitySelect("sedentary")}
-              >
-                <Text style={styles.optionText}>
-                  🛋️ Sedentario (Casi no me muevo)
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.optionButton}
-                onPress={() => handleActivitySelect("light")}
-              >
-                <Text style={styles.optionText}>
-                  🚶 Ligero (Camino un poco)
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.optionButton}
-                onPress={() => handleActivitySelect("moderate")}
-              >
-                <Text style={styles.optionText}>
-                  🏃 Moderado (Hago ejercicio regular)
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.optionButton}
-                onPress={() => handleActivitySelect("intense")}
-              >
-                <Text style={styles.optionText}>
-                  🔥 Intenso (Entreno a diario)
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={[styles.onboardingInput, { flex: 1, marginBottom: 0 }]}
+                  placeholder="Ej: Michi..."
+                  placeholderTextColor="#9CA3AF"
+                  value={tempProfile.catName || ""}
+                  onChangeText={(text) =>
+                    setTempProfile({ ...tempProfile, catName: text })
+                  }
+                  maxLength={15}
+                />
+                <TouchableOpacity
+                  style={styles.onboardingNextBtn}
+                  onPress={handleNameSubmit}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.onboardingNextBtnText}>▶</Text>
+                </TouchableOpacity>
+              </View>
             </>
           )}
 
           {onboardingStep === 1 && (
             <>
-              <Text style={{ fontSize: 80, marginBottom: 10 }}>💤</Text>
-              <Text style={styles.title}>Descanso</Text>
-              <Text style={styles.subtitle}>
-                ¿Cuántas horas duermes en promedio?
+              <Text style={styles.onboardingTitle}>ACTIVIDAD</Text>
+              <Text style={styles.onboardingSubtitle}>
+                Tu ritmo de vida habitual:
               </Text>
               <TouchableOpacity
-                style={styles.optionButton}
-                onPress={() => handleSleepSelect("less_6")}
+                style={styles.onboardingBtn}
+                onPress={() => handleActivitySelect("sedentary")}
               >
-                <Text style={styles.optionText}>Menos de 6 horas 🥱</Text>
+                <Text style={styles.onboardingBtnText}>SEDENTARIO</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.optionButton}
-                onPress={() => handleSleepSelect("6_8")}
+                style={styles.onboardingBtn}
+                onPress={() => handleActivitySelect("light")}
               >
-                <Text style={styles.optionText}>Entre 6 y 8 horas 😌</Text>
+                <Text style={styles.onboardingBtnText}>LIGERO</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.optionButton}
-                onPress={() => handleSleepSelect("more_8")}
+                style={styles.onboardingBtn}
+                onPress={() => handleActivitySelect("moderate")}
               >
-                <Text style={styles.optionText}>Más de 8 horas 😴</Text>
+                <Text style={styles.onboardingBtnText}>MODERADO</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.onboardingBtn}
+                onPress={() => handleActivitySelect("intense")}
+              >
+                <Text style={styles.onboardingBtnText}>INTENSO</Text>
               </TouchableOpacity>
             </>
           )}
 
           {onboardingStep === 2 && (
             <>
-              <Text style={{ fontSize: 80, marginBottom: 10 }}>🚭</Text>
-              <Text style={styles.title}>Hábitos</Text>
-              <Text style={styles.subtitle}>¿Fumas actualmente?</Text>
+              <Text style={styles.onboardingTitle}>OBJETIVO</Text>
+              <Text style={styles.onboardingSubtitle}>
+                Meta de pasos diarios:
+              </Text>
+              <TextInput
+                style={styles.onboardingInput}
+                keyboardType="numeric"
+                placeholder="10000"
+                placeholderTextColor="#9CA3AF"
+                value={customGoal}
+                onChangeText={setCustomGoal}
+                maxLength={6}
+              />
               <TouchableOpacity
-                style={styles.optionButton}
-                onPress={() => handleHabitsSelect(false)}
+                style={[styles.onboardingBtn, { backgroundColor: "#F8BBD0" }]}
+                onPress={handleGoalSubmit}
               >
-                <Text style={styles.optionText}>No, soy libre de humo 🌿</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.optionButtonWarning}
-                onPress={() => handleHabitsSelect(true)}
-              >
-                <Text style={styles.optionTextWarning}>Sí, fumo 🚬</Text>
+                <Text style={styles.onboardingBtnText}>GUARDAR META</Text>
               </TouchableOpacity>
             </>
           )}
 
           {onboardingStep === 3 && (
             <>
-              <Text style={{ fontSize: 80, marginBottom: 10 }}>🐾</Text>
-              <Text style={styles.title}>Tu Mascota</Text>
-              <Text style={styles.subtitle}>Dale un nombre y color</Text>
-
-              <TextInput
-                style={styles.input}
-                placeholder="Ej: Michi..."
-                value={tempProfile.catName || ""}
-                onChangeText={(text) =>
-                  setTempProfile({ ...tempProfile, catName: text })
-                }
-                maxLength={15}
-              />
-
-              <View style={styles.colorRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.colorBox,
-                    tempProfile.catColor === "orange" && styles.colorBoxActive,
-                  ]}
-                  onPress={() =>
-                    setTempProfile({ ...tempProfile, catColor: "orange" })
-                  }
-                >
-                  <Text style={styles.emoji}>🐈</Text>
-                  <Text style={styles.colorName}>Naranja</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.colorBox,
-                    tempProfile.catColor === "black" && styles.colorBoxActive,
-                  ]}
-                  onPress={() =>
-                    setTempProfile({ ...tempProfile, catColor: "black" })
-                  }
-                >
-                  <Text style={styles.emoji}>🐈‍⬛</Text>
-                  <Text style={styles.colorName}>Negro</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.colorBox,
-                    tempProfile.catColor === "white" && styles.colorBoxActive,
-                  ]}
-                  onPress={() =>
-                    setTempProfile({ ...tempProfile, catColor: "white" })
-                  }
-                >
-                  <Text style={styles.emoji}>🐱</Text>
-                  <Text style={styles.colorName}>Blanco</Text>
-                </TouchableOpacity>
-              </View>
-
+              <Text style={styles.onboardingTitle}>DESCANSO</Text>
+              <Text style={styles.onboardingSubtitle}>
+                Horas de sueño diario:
+              </Text>
               <TouchableOpacity
-                style={[
-                  styles.optionButton,
-                  { marginTop: 20, backgroundColor: "#34D399" },
-                ]}
-                onPress={() => {
-                  completeOnboarding({
-                    ...tempProfile,
-                    catName: tempProfile.catName || "Gatito",
-                    catColor: tempProfile.catColor || "orange",
-                  } as UserProfile);
-                }}
+                style={styles.onboardingBtn}
+                onPress={() => handleSleepSelect("less_4")}
               >
-                <Text style={styles.optionText}>¡Comenzar! 🚀</Text>
+                <Text style={styles.onboardingBtnText}>&lt; 4 HORAS</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.onboardingBtn}
+                onPress={() => handleSleepSelect("less_6")}
+              >
+                <Text style={styles.onboardingBtnText}>&lt; 6 HORAS</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.onboardingBtn}
+                onPress={() => handleSleepSelect("6_8")}
+              >
+                <Text style={styles.onboardingBtnText}>6 A 8 HORAS</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.onboardingBtn}
+                onPress={() => handleSleepSelect("more_8")}
+              >
+                <Text style={styles.onboardingBtnText}>+8 HORAS</Text>
               </TouchableOpacity>
             </>
           )}
@@ -300,336 +251,321 @@ export default function HomeScreen() {
     );
   }
 
-  // Dashboard Principal
   return (
-    <View style={styles.dashboardContainer}>
-      <View style={styles.card}>
-        <Text style={styles.catName}>
-          - {profile?.catName || "TU GATITO"} -
-        </Text>
-
-        <Animated.View style={{ transform: [{ translateY: floatAnim }] }}>
-          <Image source={getCatImage()} style={styles.catImage} />
-        </Animated.View>
-
-        <Text style={styles.state}>
-          {catState === "fit"
-            ? "Mega Fit"
-            : catState === "cardio"
-              ? "Saludable"
-              : catState === "paseo"
-                ? "Tranquilito"
-                : catState === "sedentario"
-                  ? "Sedentario"
-                  : "Enfermo"}
-        </Text>
-
-        {/* Barra de Progreso */}
-        <View style={styles.progressContainer}>
-          <View
-            style={[styles.progressBar, { width: `${progressPercentage}%` }]}
-          />
-        </View>
-
-        <Text style={styles.steps}>PUNTOS: {steps}</Text>
-      </View>
-
-      {/* NUEVO APARTADO DE SALUD */}
-      <View style={styles.healthSection}>
-        <Text style={styles.healthTitle}>Nivel de Salud</Text>
-        <View style={styles.facesRow}>
-          {(
-            ["enfermo", "sedentario", "paseo", "cardio", "fit"] as CatState[]
-          ).map((state) => (
-            <View
-              key={state}
-              style={[
-                styles.faceContainer,
-                catState === state && styles.activeFaceContainer,
-              ]}
-            >
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* ÁREA CENTRAL DEL GATO */}
+      <View style={styles.lcdCenter}>
+        {/* HUD: Placa de nombre y Barra de HP (Pasos) */}
+        <View style={styles.hudContainer}>
+          <View style={styles.namePlate}>
+            <Text style={styles.catNameText}>
+              {profile?.catName || "TU GATITO"}
+            </Text>
+            {compoundState.isInsane && (
               <Image
-                source={getFaceImage(state)}
-                style={[
-                  styles.faceImage,
-                  catState !== state && styles.inactiveFace,
-                ]}
+                source={require("../../assets/images/icono-locura.png")}
+                style={styles.madnessIcon}
+                resizeMode="contain"
               />
+            )}
+          </View>
+          <View style={{ width: "100%" }}>
+            <View style={styles.hpBarWrapper}>
+              <Text style={styles.hpLabel}>LVL</Text>
+              <View style={styles.hpBarOutline}>
+                <View
+                  style={[
+                    styles.hpBarFill,
+                    { width: `${progressPercentage}%` },
+                  ]}
+                />
+                {/* Marca de la Meta Personal del Usuario */}
+                <View
+                  style={[
+                    styles.goalMarker,
+                    { left: `${markerPositionPercentage}%` },
+                  ]}
+                />
+              </View>
             </View>
-          ))}
+            <View style={styles.hpTextRow}>
+              <Text style={styles.hpGoalText}>
+                {pedometerSteps} / 12000 OMS
+              </Text>
+              {pedometerSteps >= 12000 && (
+                <Animated.Image
+                  source={require("../../assets/images/icono-fuego.png")}
+                  style={[
+                    styles.fireImage,
+                    { transform: [{ scale: fireAnim }] },
+                  ]}
+                  resizeMode="contain"
+                />
+              )}
+            </View>
+          </View>
         </View>
-      </View>
 
-      {/* BOTONES DE DESARROLLADOR SUTILES */}
-      <View style={styles.debugContainer}>
-        <Text style={styles.debugTitle}>-- dev tools --</Text>
-        <View style={styles.debugButtonsRow}>
-          <TouchableOpacity
-            style={styles.debugButton}
-            onPress={() => addSimulatedSteps(1000)}
-          >
-            <Text style={styles.debugButtonText}>+1000 Pts</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.debugButton} onPress={resetSteps}>
-            <Text style={styles.debugButtonText}>Reset</Text>
-          </TouchableOpacity>
+        <Animated.View
+          style={[
+            styles.imageContainer,
+            { transform: [{ translateY: floatAnim }] },
+          ]}
+        >
+          <Image
+            source={getCatImage(compoundState, profile?.catColor)}
+            style={styles.catImage}
+            resizeMode="contain"
+          />
+        </Animated.View>
+        <View style={styles.dialogueBox}>
+          <Text style={styles.lcdStateText}>
+            > {getCatStateName(compoundState)}
+          </Text>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFB7B2", // Color de carcasa Tamagotchi (Rosa Pastel)
+    backgroundColor: "transparent",
   },
   content: {
-    alignItems: "center",
-    padding: 24,
-    paddingTop: 60, // Más espacio arriba
-    paddingBottom: 40, // Espacio extra abajo para que no lo tapen las pestañas
+    flexGrow: 1,
+    justifyContent: "space-between",
+    paddingVertical: 20,
+    paddingHorizontal: 10,
   },
-  dashboardContainer: {
-    flex: 1,
-    backgroundColor: "#FFB7B2",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
+  title: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: "#37474F",
+    fontFamily: "monospace",
+    textTransform: "uppercase",
+    marginBottom: 10,
   },
   subtitle: {
     fontSize: 18,
-    color: "#374151",
+    color: "#37474F",
     fontFamily: "monospace",
     marginBottom: 30,
     textAlign: "center",
   },
-  card: {
-    backgroundColor: "#96CDC3", // Color de Pantalla LCD clásica
-    paddingTop: 20,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    borderWidth: 6, // Borde ajustado
-    borderColor: "#1F2937",
-    alignItems: "center",
-    marginBottom: 15,
-    width: "100%",
-    shadowColor: "#1F2937",
-    shadowOffset: { width: 6, height: 6 }, // Sombra ajustada
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 8,
-  },
-  catName: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#1F2937",
-    fontFamily: "monospace",
-    textTransform: "uppercase",
-    marginBottom: 10,
-    letterSpacing: 2,
-  },
-  catImage: {
-    width: 190, // Imagen ajustada para que quepa en pantalla
-    height: 190,
-    marginBottom: 15,
-    resizeMode: "contain",
-  },
-  state: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: "#1F2937",
-    fontFamily: "monospace",
-    textTransform: "uppercase",
-    textAlign: "center",
-    marginBottom: 15,
-    backgroundColor: "#FDE047", // Etiqueta amarilla de estado
-    paddingHorizontal: 15,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 3,
-    borderColor: "#1F2937",
-  },
-  progressContainer: {
-    width: "100%",
-    height: 20,
-    backgroundColor: "#1F2937", // Borde negro para la barra
-    borderRadius: 10,
-    padding: 4,
-    marginBottom: 10,
-  },
-  progressBar: {
-    height: "100%",
-    backgroundColor: "#34D399", // Verde vibrante digital
-    borderRadius: 4,
-  },
-  steps: {
-    fontSize: 20,
-    color: "#1F2937",
-    fontWeight: "900",
-    fontFamily: "monospace",
-  },
-
-  // Estilos sutiles para Dev Tools
-  debugContainer: {
-    marginTop: 30,
-    alignItems: "center",
-    width: "100%",
-  },
-  debugTitle: {
-    fontFamily: "monospace",
-    color: "#9CA3AF",
-    fontSize: 10,
-    marginBottom: 5,
-  },
-  debugButtonsRow: {
-    flexDirection: "row",
-    gap: 15,
-  },
-  debugButton: {
-    padding: 8,
-  },
-  debugButtonText: {
-    color: "#6B7280",
-    fontFamily: "monospace",
-    fontSize: 12,
-  },
-
-  // Estilos de la sección de Salud (Timeline)
-  healthSection: {
-    marginTop: 10,
-    backgroundColor: "#E2E8F0",
-    padding: 15,
-    borderRadius: 16,
-    borderWidth: 4,
-    borderColor: "#1F2937",
-    width: "100%",
-    shadowColor: "#1F2937",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-  },
-  healthTitle: {
-    fontSize: 14,
-    fontWeight: "900",
-    color: "#1F2937",
-    fontFamily: "monospace",
-    textTransform: "uppercase",
-    textAlign: "center",
-    marginBottom: 15,
-  },
-  facesRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  faceContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    borderWidth: 3,
-    borderColor: "transparent",
+  lcdCenter: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFFFFF",
+    width: "100%",
   },
-  activeFaceContainer: {
-    borderColor: "#1F2937",
-    backgroundColor: "#FDE047", // Amarillo para destacar el actual
+  hudContainer: {
+    width: "100%",
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    alignItems: "flex-start",
   },
-  faceImage: {
-    width: 32,
-    height: 32,
-    resizeMode: "contain",
+  topHudRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
   },
-  inactiveFace: {
-    opacity: 0.3, // Opaca las caras que no son el estado actual
+  namePlate: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#37474F",
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    boxShadow: "2px 2px 0px rgba(0,0,0,0.2)",
   },
-
-  // Estilos del Onboarding
-  onboardingCard: {
-    backgroundColor: "#FFF",
-    padding: 30,
-    borderRadius: 16,
-    borderWidth: 4,
-    borderColor: "#1F2937",
+  catNameText: {
+    color: "#E8F5E9",
+    fontSize: 12,
+    fontWeight: "900",
+    fontFamily: "monospace",
+    textTransform: "uppercase",
+    letterSpacing: 2,
+  },
+  madnessIcon: {
+    width: 28,
+    height: 28,
+    marginLeft: 10,
+  },
+  hpBarWrapper: {
+    flexDirection: "row",
     alignItems: "center",
     width: "100%",
-    shadowColor: "#1F2937",
-    shadowOffset: { width: 6, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 8,
   },
-  optionButton: {
-    backgroundColor: "#E0E7FF",
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    borderWidth: 3,
-    borderColor: "#1F2937",
-    width: "100%",
-    marginBottom: 12,
-  },
-  optionText: {
-    color: "#1F2937",
+  hpLabel: {
+    fontFamily: "monospace",
     fontWeight: "900",
     fontSize: 14,
-    fontFamily: "monospace",
-    textAlign: "center",
+    color: "#37474F",
+    marginRight: 8,
   },
-  optionButtonWarning: {
-    backgroundColor: "#FECACA",
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+  hpBarOutline: {
+    flex: 1,
+    height: 16,
     borderWidth: 3,
-    borderColor: "#1F2937",
-    width: "100%",
-    marginBottom: 12,
+    borderColor: "#37474F",
+    backgroundColor: "transparent",
+    padding: 1,
+    position: "relative",
   },
-  optionTextWarning: {
-    color: "#1F2937",
-    fontWeight: "900",
-    fontSize: 14,
+  hpBarFill: {
+    height: "100%",
+    backgroundColor: "#37474F",
+  },
+  goalMarker: {
+    position: "absolute",
+    top: -3,
+    bottom: -3,
+    width: 4,
+    backgroundColor: "#FBC02D", // Amarillo de advertencia
+    borderWidth: 1,
+    borderColor: "#37474F",
+    zIndex: 10,
+  },
+  hpTextRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    marginTop: 4,
+  },
+  hpGoalText: {
     fontFamily: "monospace",
-    textAlign: "center",
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#37474F",
+    opacity: 0.6,
   },
-  input: {
-    backgroundColor: "#FFFFFF",
+  fireImage: {
+    width: 16,
+    height: 16,
+    marginLeft: 5,
+  },
+  imageContainer: {
+    flex: 1,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dialogueBox: {
+    width: "100%",
+    backgroundColor: "transparent",
+    borderWidth: 3,
+    borderColor: "#37474F",
     borderRadius: 8,
+    padding: 10,
+    marginTop: 15,
+    borderStyle: "dashed", // Un borde punteado para darle más estilo de terminal retro
+  },
+  lcdStateText: {
+    fontSize: 12, // Letra un poco más pequeña para que quepan las frases largas
+    fontWeight: "900",
+    color: "#37474F",
+    fontFamily: "monospace",
+    textTransform: "uppercase",
+    lineHeight: 18,
+  },
+  catImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  // ESTILOS DEL ONBOARDING (CUESTIONARIO INICIAL)
+  onboardingContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+  },
+  onboardingCard: {
+    backgroundColor: "#FFF9C4",
+    padding: 25,
+    borderRadius: 16,
+    borderWidth: 4,
+    borderColor: "#37474F",
+    alignItems: "center",
+    width: "100%",
+    boxShadow: "4px 4px 0px #37474F",
+  },
+  onboardingImage: {
+    width: 90,
+    height: 90,
+    marginBottom: 20,
+  },
+  onboardingTitle: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#37474F",
+    fontFamily: "monospace",
+    textTransform: "uppercase",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  onboardingSubtitle: {
+    fontSize: 12,
+    color: "#37474F",
+    fontFamily: "monospace",
+    marginBottom: 20,
+    textAlign: "center",
+    textTransform: "uppercase",
+  },
+  onboardingInput: {
+    backgroundColor: "#E8F5E9",
+    borderRadius: 12,
     borderWidth: 3,
-    borderColor: "#1F2937",
+    borderColor: "#37474F",
     padding: 15,
     fontSize: 16,
     fontFamily: "monospace",
     marginBottom: 20,
-    color: "#111827",
+    color: "#37474F",
     width: "100%",
+    textAlign: "center",
   },
-  colorRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
-    width: "100%",
-  },
-  colorBox: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    padding: 15,
+  onboardingBtn: {
+    backgroundColor: "#B2EBF2",
+    paddingVertical: 15,
+    paddingHorizontal: 20,
     borderRadius: 12,
-    alignItems: "center",
     borderWidth: 3,
-    borderColor: "#1F2937",
+    borderColor: "#37474F",
+    width: "100%",
+    marginBottom: 12,
+    alignItems: "center",
+    boxShadow: "2px 2px 0px #37474F",
   },
-  colorBoxActive: { backgroundColor: "#FDE047" },
-  emoji: { fontSize: 32, marginBottom: 5 },
-  colorName: {
-    fontSize: 10,
+  onboardingBtnText: {
+    color: "#37474F",
     fontWeight: "900",
-    color: "#1F2937",
+    fontSize: 14,
     fontFamily: "monospace",
     textTransform: "uppercase",
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    gap: 10,
+    marginBottom: 20,
+  },
+  onboardingNextBtn: {
+    backgroundColor: "#F8BBD0",
+    width: 54,
+    height: 54,
+    borderRadius: 12,
+    borderWidth: 3,
+    borderColor: "#37474F",
+    justifyContent: "center",
+    alignItems: "center",
+    boxShadow: "2px 2px 0px #37474F",
+  },
+  onboardingNextBtnText: {
+    color: "#37474F",
+    fontSize: 20,
   },
 });

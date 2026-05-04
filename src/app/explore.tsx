@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -7,63 +8,95 @@ import {
   View,
 } from "react-native";
 import { useOnboarding } from "../hooks/useOnboarding";
-import { usePedometer } from "../hooks/usePedometer";
+
+const ACTIVITIES = [
+  {
+    id: 1,
+    title: "Deporte",
+    points: 30,
+    image: require("../../assets/images/negro/actividades/deporte.png"),
+  },
+  {
+    id: 2,
+    title: "Socializar",
+    points: 25,
+    image: require("../../assets/images/negro/actividades/amigos.png"),
+  },
+  {
+    id: 3,
+    title: "Hobby",
+    points: 20,
+    image: require("../../assets/images/negro/actividades/hobby.png"),
+  },
+  {
+    id: 4,
+    title: "Comer Sano",
+    points: 15,
+    image: require("../../assets/images/negro/actividades/comida-saludable.png"),
+  },
+  {
+    id: 5,
+    title: "Leer",
+    points: 15,
+    image: require("../../assets/images/negro/actividades/leer.png"),
+  },
+  {
+    id: 6,
+    title: "Actividad",
+    points: 10,
+    image: require("../../assets/images/negro/actividades/actividad.png"),
+  },
+];
 
 export default function ExploreScreen() {
-  const { addSimulatedSteps } = usePedometer();
-  const { profile } = useOnboarding();
+  const { profile, updateProfile } = useOnboarding();
 
-  const activities = [
-    { id: 1, title: "Correr 5km", steps: 6000, icon: "🏃‍♂️", color: "#BAE6FD" },
-    {
-      id: 2,
-      title: "Pasear al perro",
-      steps: 2500,
-      icon: "🦮",
-      color: "#FDE047",
-    },
-    {
-      id: 3,
-      title: "Entrenamiento (Pesas)",
-      steps: 3000,
-      icon: "🏋️",
-      color: "#E9D5FF",
-    },
-    {
-      id: 4,
-      title: "Limpiar la casa",
-      steps: 1500,
-      icon: "🧹",
-      color: "#A7F3D0",
-    },
-    {
-      id: 5,
-      title: "Clase de Yoga",
-      steps: 2000,
-      icon: "🧘",
-      color: "#FECDD3",
-    },
-  ];
+  const currentSanity = profile?.sanityPoints || 0;
+
+  const handleActivity = (points: number) => {
+    // Sumamos los puntos limitando el máximo a 100
+    const newSanity = Math.min(currentSanity + points, 100);
+
+    updateProfile({
+      sanityPoints: newSanity,
+      lastHobbyDate: Date.now(),
+    });
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.header}>Zona de Actividades</Text>
-      <Text style={styles.subtitle}>
-        Registra lo que has hecho hoy para mejorar la salud de{" "}
-        {profile?.catName || "tu gatito"}.
-      </Text>
+      {/* HEADER COMPACTO Y MINIMALISTA */}
+      <View style={styles.headerContainer}>
+        <Text style={styles.header}>ACTIVIDADES</Text>
+        <View style={styles.sanityCompact}>
+          <Text style={styles.sanityLabel}>MENTE: {currentSanity}%</Text>
+          <View style={styles.sanityBarBg}>
+            <View
+              style={[styles.sanityBarFill, { width: `${currentSanity}%` }]}
+            />
+          </View>
+        </View>
+      </View>
 
       <View style={styles.grid}>
-        {activities.map((activity) => (
+        {ACTIVITIES.map((activity) => (
           <TouchableOpacity
             key={activity.id}
-            activeOpacity={0.6}
-            style={[styles.activityCard, { backgroundColor: activity.color }]}
-            onPress={() => addSimulatedSteps(activity.steps)}
+            activeOpacity={0.5}
+            style={styles.activityItem}
+            onPress={() => handleActivity(activity.points)}
           >
-            <Text style={styles.icon}>{activity.icon}</Text>
+            <View style={styles.imageContainer}>
+              <Image
+                source={activity.image}
+                style={styles.activityImage}
+                resizeMode="contain"
+              />
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>+{activity.points}</Text>
+              </View>
+            </View>
             <Text style={styles.activityTitle}>{activity.title}</Text>
-            <Text style={styles.activitySteps}>+{activity.steps} pts</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -74,61 +107,94 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFB7B2",
+    backgroundColor: "transparent",
   },
   content: {
-    padding: 24,
-    paddingTop: 60,
+    padding: 20,
+    paddingTop: 30,
+    paddingBottom: 40,
+  },
+  headerContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 30,
+    borderBottomWidth: 3,
+    borderBottomColor: "#37474F",
+    paddingBottom: 15,
   },
   header: {
-    fontSize: 32,
+    fontSize: 22,
     fontWeight: "900",
-    color: "#1F2937",
+    color: "#37474F",
     fontFamily: "monospace",
     textTransform: "uppercase",
-    marginBottom: 10,
   },
-  subtitle: {
-    fontSize: 16,
-    color: "#374151",
+  sanityCompact: {
+    alignItems: "flex-end",
+    width: "40%",
+  },
+  sanityLabel: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#37474F",
     fontFamily: "monospace",
-    marginBottom: 30,
-    lineHeight: 24,
+    marginBottom: 4,
+  },
+  sanityBarBg: {
+    width: "100%",
+    height: 12,
+    backgroundColor: "transparent",
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "#37474F",
+    padding: 1,
+  },
+  sanityBarFill: {
+    height: "100%",
+    borderRadius: 4,
+    backgroundColor: "#37474F",
   },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 15,
+    justifyContent: "space-around",
+    gap: 10,
   },
-  activityCard: {
-    width: "47%",
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 3,
-    borderColor: "#1F2937",
+  activityItem: {
+    width: "42%",
     alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#1F2937",
-    shadowOffset: { width: 6, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 6,
-    marginBottom: 15,
+    marginBottom: 25,
   },
-  icon: { fontSize: 40, marginBottom: 10 },
-  activityTitle: {
-    fontSize: 14,
+  imageContainer: {
+    position: "relative",
+    marginBottom: 10,
+  },
+  activityImage: {
+    width: 90,
+    height: 90,
+  },
+  badge: {
+    position: "absolute",
+    bottom: -5,
+    right: -10,
+    backgroundColor: "#37474F",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  badgeText: {
+    color: "#E8F5E9", // LCD Verde Menta
+    fontSize: 10,
     fontWeight: "900",
-    color: "#111827",
+    fontFamily: "monospace",
+  },
+  activityTitle: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#37474F",
     fontFamily: "monospace",
     textAlign: "center",
-    marginBottom: 5,
-  },
-  activitySteps: {
-    fontSize: 14,
-    color: "#374151",
-    fontWeight: "bold",
-    fontFamily: "monospace",
+    textTransform: "uppercase",
   },
 });

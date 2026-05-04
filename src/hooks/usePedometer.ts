@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { Platform } from "react-native";
 
 const STEPS_KEY = "@dicocat_steps_today";
+const DATE_KEY = "@dicocat_last_date";
 
 // Memoria temporal en caso de que el módulo nativo falle en un APK desactualizado
 const memoryStorage = new Map<string, string>();
@@ -54,9 +55,20 @@ export function usePedometer() {
     useCallback(() => {
       const loadSteps = async () => {
         try {
+          const today = new Date().toDateString();
+          const savedDate = await safeStorage.getItem(DATE_KEY);
           const savedSteps = await safeStorage.getItem(STEPS_KEY);
-          if (savedSteps !== null) {
-            setSteps(parseInt(savedSteps, 10));
+
+          // CICLO DIARIO: Si cambió el día, reseteamos a 0
+          if (savedDate !== today) {
+            setSteps(0);
+            await safeStorage.setItem(STEPS_KEY, "0");
+            await safeStorage.setItem(DATE_KEY, today);
+          } else {
+            // Si es el mismo día, cargamos los pasos guardados
+            if (savedSteps !== null) {
+              setSteps(parseInt(savedSteps, 10));
+            }
           }
         } catch (error) {
           console.log("Error leyendo pasos de Storage:", error);
@@ -74,6 +86,8 @@ export function usePedometer() {
       safeStorage.setItem(STEPS_KEY, newSteps.toString()).catch((error) => {
         console.log("Error guardando pasos:", error);
       });
+      // Aseguramos que la fecha también esté guardada
+      safeStorage.setItem(DATE_KEY, new Date().toDateString()).catch(() => {});
       return newSteps;
     });
   };

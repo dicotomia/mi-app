@@ -4,32 +4,32 @@
     "slug": "mi-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/black-fit-cara.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "miapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/black-fit-cara.png"
+      "icon": "./assets/images/icon.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#FFB7B2",
-        "foregroundImage": "./assets/images/black-fit-cara.png"
+        "backgroundColor": "#F8BBD0",
+        "foregroundImage": "./assets/images/icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.dicotomia.miapp"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/black-fit-cara.png"
+      "favicon": "./assets/images/icon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FFB7B2",
+          "backgroundColor": "#F8BBD0",
           "android": {
-            "image": "./assets/images/black-fit-cara.png",
+            "image": "./assets/images/icon.png",
             "imageWidth": 150
           }
         }

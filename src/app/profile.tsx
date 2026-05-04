@@ -10,25 +10,29 @@ import {
   View,
 } from "react-native";
 import { useOnboarding } from "../hooks/useOnboarding";
+import { usePedometer } from "../hooks/usePedometer";
 
 const ProfileScreen = () => {
   const { profile, updateProfile, resetProfile } = useOnboarding();
+  const { addSimulatedSteps, resetSteps } = usePedometer();
   const router = useRouter();
 
   // Estados locales para la edición
   const [catName, setCatName] = useState(profile?.catName || "");
-  const [catColor, setCatColor] = useState(profile?.catColor || "orange");
+  const [stepGoal, setStepGoal] = useState(
+    profile?.stepGoal?.toString() || "10000",
+  );
   const [activityLevel, setActivityLevel] = useState(
     profile?.activityLevel || "moderate",
   );
-  const [smoker, setSmoker] = useState(profile?.smoker || false);
+  const [sleepHours, setSleepHours] = useState(profile?.sleepHours || "6_8");
 
   const handleSave = () => {
     updateProfile({
       catName: catName || "Gatito",
-      catColor,
+      stepGoal: parseInt(stepGoal) || 10000,
       activityLevel,
-      smoker,
+      sleepHours,
     });
     Alert.alert(
       "¡Guardado!",
@@ -43,62 +47,38 @@ const ProfileScreen = () => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.header}>⚙️ Menú Tamagotchi</Text>
+      <Text style={styles.header}>Ajustes</Text>
       <Text style={styles.subtitle}>
         Personaliza a {profile?.catName || "tu mascota"} y actualiza tu estado.
       </Text>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>🐾 Tu Compañero</Text>
+        <Text style={styles.sectionTitle}>Compañero</Text>
 
         <Text style={styles.label}>Nombre:</Text>
         <TextInput
           style={styles.input}
           placeholder="Ej: Michi, Garfield..."
+          placeholderTextColor="#9CA3AF"
           value={catName}
           onChangeText={setCatName}
           maxLength={15}
         />
 
-        <Text style={styles.label}>Color del pelaje:</Text>
-        <View style={styles.colorRow}>
-          <TouchableOpacity
-            style={[
-              styles.colorBox,
-              catColor === "orange" && styles.colorBoxActive,
-            ]}
-            onPress={() => setCatColor("orange")}
-          >
-            <Text style={styles.emoji}>🐈</Text>
-            <Text style={styles.colorName}>Naranja</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.colorBox,
-              catColor === "black" && styles.colorBoxActive,
-            ]}
-            onPress={() => setCatColor("black")}
-          >
-            <Text style={styles.emoji}>🐈‍⬛</Text>
-            <Text style={styles.colorName}>Negro</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.colorBox,
-              catColor === "white" && styles.colorBoxActive,
-            ]}
-            onPress={() => setCatColor("white")}
-          >
-            <Text style={styles.emoji}>🐱</Text>
-            <Text style={styles.colorName}>Blanco</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.label}>Meta de Pasos Diarios:</Text>
+        <TextInput
+          style={styles.input}
+          keyboardType="numeric"
+          placeholder="Ej: 10000"
+          placeholderTextColor="#9CA3AF"
+          value={stepGoal}
+          onChangeText={setStepGoal}
+          maxLength={6}
+        />
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>👤 Hábitos</Text>
+        <Text style={styles.sectionTitle}>Hábitos</Text>
 
         <Text style={styles.label}>Nivel de Actividad:</Text>
         <View style={styles.habitRow}>
@@ -142,25 +122,76 @@ const ProfileScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.label}>Fumador:</Text>
+        <Text style={styles.label}>Horas de sueño:</Text>
         <View style={styles.habitRow}>
           <TouchableOpacity
-            style={[styles.habitBtn, !smoker && styles.colorBoxActive]}
-            onPress={() => setSmoker(false)}
+            style={[
+              styles.habitBtn,
+              sleepHours === "less_4" && { backgroundColor: "#FECACA" },
+            ]}
+            onPress={() => setSleepHours("less_4")}
           >
-            <Text style={styles.habitText}>No 🌿</Text>
+            <Text style={styles.habitText}>&lt; 4h 🧟</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.habitBtn, smoker && { backgroundColor: "#FECACA" }]}
-            onPress={() => setSmoker(true)}
+            style={[
+              styles.habitBtn,
+              sleepHours === "less_6" && { backgroundColor: "#FDE047" },
+            ]}
+            onPress={() => setSleepHours("less_6")}
           >
-            <Text style={styles.habitText}>Sí 🚬</Text>
+            <Text style={styles.habitText}>&lt; 6h 🥱</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.habitBtn,
+              (sleepHours === "6_8" || sleepHours === "more_8") &&
+                styles.colorBoxActive,
+            ]}
+            onPress={() => setSleepHours("6_8")}
+          >
+            <Text style={styles.habitText}>+6h 😴</Text>
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={styles.resetButton} onPress={handleFullReset}>
           <Text style={styles.resetButtonText}>🔄 Rehacer test de salud</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* SECCIÓN TEMPORAL DE DESARROLLO (DEV TOOLS) */}
+      <View style={styles.devCard}>
+        <Text style={styles.devTitle}>⚠️ ZONA DE PRUEBAS (DEV)</Text>
+        <View style={styles.devGrid}>
+          <TouchableOpacity
+            style={styles.devBtn}
+            onPress={() => addSimulatedSteps(1000)}
+          >
+            <Text style={styles.devBtnText}>+1000 PASOS</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.devBtn} onPress={resetSteps}>
+            <Text style={styles.devBtnText}>RESET PASOS</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.devBtn}
+            onPress={() =>
+              updateProfile({
+                sanityPoints: 0,
+                lastHobbyDate: Date.now() - 100000000,
+              })
+            }
+          >
+            <Text style={styles.devBtnText}>FORZAR LOCURA</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.devBtn}
+            onPress={() => updateProfile({ forceSleep: !profile?.forceSleep })}
+          >
+            <Text style={styles.devBtnText}>
+              {profile?.forceSleep ? "☀️ DESPERTAR" : "🌙 FORZAR SUEÑO"}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
@@ -171,76 +202,73 @@ const ProfileScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFB7B2" },
-  content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
+  container: { flex: 1, backgroundColor: "transparent" },
+  content: { padding: 24, paddingTop: 40, paddingBottom: 40 },
   header: {
     fontSize: 28,
     fontWeight: "900",
-    color: "#1F2937",
+    color: "#37474F",
     fontFamily: "monospace",
     textTransform: "uppercase",
     marginBottom: 5,
   },
   subtitle: {
     fontSize: 14,
-    color: "#374151",
+    color: "#37474F",
     fontFamily: "monospace",
     marginBottom: 20,
   },
   card: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "transparent",
     padding: 24,
     borderRadius: 16,
     borderWidth: 4,
-    borderColor: "#1F2937",
+    borderColor: "#37474F",
     marginBottom: 20,
-    shadowColor: "#1F2937",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    boxShadow: "4px 4px 0px #37474F",
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "900",
-    color: "#1F2937",
+    color: "#37474F",
     fontFamily: "monospace",
     textTransform: "uppercase",
     marginBottom: 15,
   },
   label: {
     fontSize: 14,
-    color: "#374151",
+    color: "#37474F",
     fontWeight: "900",
     fontFamily: "monospace",
     marginBottom: 8,
   },
   input: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 8,
+    backgroundColor: "transparent",
+    borderRadius: 12,
     borderWidth: 3,
-    borderColor: "#1F2937",
+    borderColor: "#37474F",
     padding: 15,
     fontSize: 16,
     fontFamily: "monospace",
     marginBottom: 20,
-    color: "#111827",
+    color: "#37474F",
   },
   colorRow: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
   colorBox: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     padding: 15,
     borderRadius: 12,
     alignItems: "center",
     borderWidth: 3,
-    borderColor: "#1F2937",
+    borderColor: "#37474F",
   },
-  colorBoxActive: { backgroundColor: "#FDE047" }, // Seleccionado se vuelve amarillo pastel
+  colorBoxActive: { backgroundColor: "#37474F" }, // Invertimos para LCD
   emoji: { fontSize: 32, marginBottom: 5 },
   colorName: {
     fontSize: 12,
     fontWeight: "900",
-    color: "#1F2937",
+    color: "#E8F5E9", // Verde Menta Pastel
     fontFamily: "monospace",
     textTransform: "uppercase",
   },
@@ -251,54 +279,89 @@ const styles = StyleSheet.create({
   },
   habitBtn: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 3,
-    borderColor: "#1F2937",
+    borderColor: "#37474F",
     alignItems: "center",
   },
   habitText: {
     fontSize: 12,
     fontWeight: "900",
-    color: "#1F2937",
+    color: "#37474F",
     fontFamily: "monospace",
     textTransform: "uppercase",
   },
   resetButton: {
     marginTop: 20,
     padding: 15,
-    backgroundColor: "#FECACA",
+    backgroundColor: "transparent",
     borderRadius: 12,
     borderWidth: 3,
-    borderColor: "#1F2937",
+    borderColor: "#37474F",
     alignItems: "center",
   },
   resetButtonText: {
-    color: "#1F2937",
+    color: "#37474F",
     fontWeight: "900",
     fontFamily: "monospace",
     textTransform: "uppercase",
   },
   saveButton: {
-    backgroundColor: "#34D399", // Verde para guardar
+    backgroundColor: "transparent",
     paddingVertical: 18,
-    borderRadius: 12,
-    borderWidth: 3,
-    borderColor: "#1F2937",
+    borderRadius: 16,
+    borderWidth: 4,
+    borderColor: "#37474F",
     alignItems: "center",
     marginTop: 10,
-    shadowColor: "#1F2937",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    boxShadow: "4px 4px 0px #37474F",
   },
   saveButtonText: {
-    color: "#1F2937",
+    color: "#37474F",
     fontWeight: "900",
     fontSize: 16,
     fontFamily: "monospace",
     textTransform: "uppercase",
+  },
+  devCard: {
+    backgroundColor: "#FFEBEE", // Fondo rosado de alerta
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 3,
+    borderColor: "#D32F2F", // Borde rojo fuerte
+    borderStyle: "dashed",
+    marginBottom: 20,
+  },
+  devTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#D32F2F",
+    fontFamily: "monospace",
+    textAlign: "center",
+    marginBottom: 15,
+  },
+  devGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  devBtn: {
+    backgroundColor: "transparent",
+    padding: 10,
+    borderWidth: 2,
+    borderColor: "#D32F2F",
+    borderRadius: 8,
+    width: "48%",
+    alignItems: "center",
+  },
+  devBtnText: {
+    color: "#D32F2F",
+    fontSize: 10,
+    fontWeight: "bold",
+    fontFamily: "monospace",
   },
 });
 

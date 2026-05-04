@@ -8,9 +8,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { CatState, useCatState } from "../hooks/useCatState";
 import { useOnboarding } from "../hooks/useOnboarding";
 import { usePedometer } from "../hooks/usePedometer";
+import { getCatStateName, getCompoundState, getFaceImage } from "../lib/cat";
 
 export default function StatsScreen() {
   const { steps } = usePedometer();
@@ -31,8 +31,12 @@ export default function StatsScreen() {
   const distance = (steps * 0.000762).toFixed(2); // 1 paso = ~0.762 metros
   const calories = (steps * 0.04).toFixed(0); // 1 paso = ~0.04 kcals
 
-  // Traemos el estado del gato para saber qué cara mostrar
-  const catState = useCatState(steps, goal);
+  // Traemos el estado del gato centralizado desde nuestra librería
+  const compoundState = getCompoundState(
+    steps,
+    profile?.sleepHours,
+    profile?.lastHobbyDate,
+  );
 
   // Animación de flotación (Idle Animation) para la cara
   const floatAnim = useRef(new Animated.Value(0)).current;
@@ -55,24 +59,6 @@ export default function StatsScreen() {
     ).start();
   }, []);
 
-  const getFaceImage = (stateName: CatState) => {
-    switch (stateName) {
-      case "fit":
-        return require("../../assets/images/black-fit-cara.png");
-      case "cardio":
-        return require("../../assets/images/black-cardio-cara.png");
-      case "paseo":
-        // Imagen faltante: Usamos la cara "sedentario" temporalmente
-        return require("../../assets/images/black-sedentario-cara.png");
-      case "sedentario":
-        return require("../../assets/images/black-sedentario-cara.png");
-      case "enfermo":
-        return require("../../assets/images/black-enfermo-cara.png");
-      default:
-        return require("../../assets/images/gatogirando.gif");
-    }
-  };
-
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.header}>📊 Estadísticas</Text>
@@ -83,23 +69,19 @@ export default function StatsScreen() {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>🐱 Estado Actual</Text>
         <View style={styles.faceContainer}>
-          <Animated.View style={{ transform: [{ translateY: floatAnim }] }}>
+          <Animated.View
+            style={[
+              styles.imageContainer,
+              { transform: [{ translateY: floatAnim }] },
+            ]}
+          >
             <Image
-              source={getFaceImage(catState)}
+              source={getFaceImage(compoundState)}
               style={styles.bigFaceImage}
+              resizeMode="contain"
             />
           </Animated.View>
-          <Text style={styles.stateText}>
-            {catState === "fit"
-              ? "Mega Fit"
-              : catState === "cardio"
-                ? "Saludable"
-                : catState === "paseo"
-                  ? "Tranquilito"
-                  : catState === "sedentario"
-                    ? "Sedentario"
-                    : "Enfermo"}
-          </Text>
+          <Text style={styles.stateText}>{getCatStateName(compoundState)}</Text>
         </View>
       </View>
 
@@ -130,11 +112,15 @@ export default function StatsScreen() {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>💡 Consejo del Día</Text>
         <Text style={styles.tipText}>
-          {progress < 50
-            ? `¡Aún tienes mucho día por delante! Un pequeño paseo de 15 minutos hará muy feliz a ${profile?.catName || "tu gatito"}.`
-            : progress < 100
-              ? `¡Ya casi lo logras! ${profile?.catName || "Tu mascota"} se está poniendo en forma gracias a ti.`
-              : `¡Meta alcanzada! ${profile?.catName || "Tu mascota"} está Mega Fit hoy. ¡Sigue así!`}
+          {compoundState.isInsane
+            ? `¡${profile?.catName || "Tu mascota"} se siente encerrada! Llévala a hacer un hobby en la zona de exploración.`
+            : compoundState.baseState === "alerta"
+              ? "¡Necesitamos movernos un poco! Has estado demasiado inactivo."
+              : compoundState.baseState === "perezoso"
+                ? "¡Levántate del sofá! Sigue siendo sedentario."
+                : compoundState.baseState === "neutral"
+                  ? `¡Bien hecho! Tienes el nivel mínimo para no tener riesgos de salud.`
+                  : "¡Imparable! Tienes un nivel óptimo de protección en tu salud."}
         </Text>
       </View>
     </ScrollView>
@@ -142,56 +128,59 @@ export default function StatsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFB7B2" },
-  content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
+  container: { flex: 1, backgroundColor: "transparent" },
+  content: { padding: 24, paddingTop: 40, paddingBottom: 40 },
   header: {
     fontSize: 32,
     fontWeight: "900",
-    color: "#1F2937",
+    color: "#37474F",
     fontFamily: "monospace",
     textTransform: "uppercase",
     marginBottom: 5,
   },
   subtitle: {
     fontSize: 16,
-    color: "#374151",
+    color: "#37474F",
     fontFamily: "monospace",
     marginBottom: 20,
   },
   card: {
-    backgroundColor: "#E2E8F0", // Gris/Azul plástico
+    backgroundColor: "transparent",
     padding: 24,
     borderRadius: 16,
     borderWidth: 4,
-    borderColor: "#1F2937",
+    borderColor: "#37474F",
     marginBottom: 20,
-    shadowColor: "#1F2937",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    boxShadow: "4px 4px 0px #37474F",
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "900",
-    color: "#1F2937",
+    color: "#37474F",
     fontFamily: "monospace",
     textTransform: "uppercase",
     marginBottom: 15,
   },
   faceContainer: {
     alignItems: "center",
-    marginBottom: 5,
+    marginBottom: 15,
+    width: "100%",
+    height: 180,
+  },
+  imageContainer: {
+    flex: 1,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
   },
   bigFaceImage: {
-    width: 140,
-    height: 140,
-    resizeMode: "contain",
-    marginBottom: 15,
+    width: "100%",
+    height: "100%",
   },
   stateText: {
     fontSize: 20,
     fontWeight: "900",
-    color: "#1F2937",
+    color: "#37474F",
     fontFamily: "monospace",
     textTransform: "uppercase",
     textAlign: "center",
@@ -199,7 +188,7 @@ const styles = StyleSheet.create({
   mainStat: {
     fontSize: 40,
     fontWeight: "900",
-    color: "#1F2937",
+    color: "#37474F",
     fontFamily: "monospace",
     marginBottom: 5,
   },
@@ -218,15 +207,21 @@ const styles = StyleSheet.create({
   progressContainer: {
     width: "100%",
     height: 20,
-    backgroundColor: "#1F2937",
+    backgroundColor: "transparent",
     borderRadius: 10,
+    borderWidth: 3,
+    borderColor: "#37474F",
     padding: 4,
     marginBottom: 10,
   },
-  progressBar: { height: "100%", backgroundColor: "#34D399", borderRadius: 4 },
+  progressBar: {
+    height: "100%",
+    backgroundColor: "#37474F",
+    borderRadius: 6,
+  },
   percentage: {
     fontSize: 14,
-    color: "#1F2937",
+    color: "#37474F",
     fontWeight: "900",
     fontFamily: "monospace",
     textAlign: "right",
@@ -239,35 +234,32 @@ const styles = StyleSheet.create({
   },
   smallCard: {
     flex: 1,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "transparent",
     padding: 20,
     borderRadius: 16,
-    borderWidth: 3,
-    borderColor: "#1F2937",
+    borderWidth: 4,
+    borderColor: "#37474F",
     alignItems: "center",
-    shadowColor: "#1F2937",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    boxShadow: "4px 4px 0px #37474F",
   },
   icon: { fontSize: 32, marginBottom: 10 },
   statValue: {
     fontSize: 24,
     fontWeight: "900",
-    color: "#1F2937",
+    color: "#37474F",
     fontFamily: "monospace",
     marginBottom: 5,
   },
   statLabel: {
     fontSize: 12,
-    color: "#374151",
+    color: "#37474F",
     fontWeight: "900",
     fontFamily: "monospace",
     textTransform: "uppercase",
   },
   tipText: {
     fontSize: 14,
-    color: "#1F2937",
+    color: "#37474F",
     lineHeight: 24,
     fontFamily: "monospace",
   },
